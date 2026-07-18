@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Uno.Core/Uno.Core.csproj" />
+  <Project Path="Uno.Data/Uno.Data.csproj" />
+  <Project Path="Uno.Tests/Uno.Tests.csproj" />
+  <Project Path="Uno.WinForms/Uno.WinForms.csproj" />
+</Solution>
