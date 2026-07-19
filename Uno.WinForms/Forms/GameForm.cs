@@ -105,7 +105,6 @@ public sealed class GameForm : Form
             BackColor = Color.Transparent,
             Margin = new Padding(0, 0, 24, 0)
         };
-        
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 170)); // Art
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 180)); // Draw
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 180)); // Discard
@@ -196,7 +195,7 @@ public sealed class GameForm : Form
     private Control CreatePileCard(string titleText, Control cardControl, Label countLabel)
     {
         var card = new RoundedPanel { Dock = DockStyle.Fill, FillColor = Color.White, CornerRadius = 20, Margin = new Padding(0, 0, 0, 24) };
-        var layout = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, BackColor = Color.Transparent, Padding = new Padding(20) };
+        var layout = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, BackColor = Color.Transparent, Padding = new Padding(14) };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));

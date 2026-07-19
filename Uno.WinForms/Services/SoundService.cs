@@ -1,137 +1,162 @@
-using System.Media;
+using NAudio.Wave;
 
 namespace Uno.WinForms.Services;
 
 public static class SoundService
 {
     private static readonly object SyncLock = new();
-    private static SoundPlayer? _buttonPlayer;
-    private static SoundPlayer? _cardPlayer;
-    private static SoundPlayer? _drawPlayer;
-    private static SoundPlayer? _errorPlayer;
-    private static SoundPlayer? _winPlayer;
-    private static SoundPlayer? _losePlayer;
-    private static SoundPlayer? _backgroundPlayer;
-    private static bool _initialized;
+    private static readonly string SoundRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "Sounds");
+    private static WaveOutEvent? _backgroundOutput;
+    private static AudioFileReader? _backgroundReader;
+    private static LoopStream? _backgroundLoop;
 
-    public static void PlayButtonClick()
-    {
-        EnsureInitialized();
-        Play(_buttonPlayer, SystemSounds.Asterisk);
-    }
+    public static void PlayButtonClick() => PlayOneShot("button_click.wav");
 
-    public static void PlayCardPlay()
-    {
-        EnsureInitialized();
-        Play(_cardPlayer, SystemSounds.Beep);
-    }
+    public static void PlayCardPlay() => PlayOneShot("soundc.wav");
 
-    public static void PlayCardDraw()
-    {
-        EnsureInitialized();
-        Play(_drawPlayer, SystemSounds.Asterisk);
-    }
+    public static void PlayCardDraw() => PlayOneShot("card_draw.wav");
 
-    public static void PlayError()
-    {
-        EnsureInitialized();
-        Play(_errorPlayer, SystemSounds.Hand);
-    }
+    public static void PlayError() => PlayOneShot("error.wav");
 
-    public static void PlayWin()
-    {
-        EnsureInitialized();
-        Play(_winPlayer, SystemSounds.Exclamation);
-    }
+    public static void PlayWin() => PlayOneShot("win.wav");
 
-    public static void PlayLose()
-    {
-        EnsureInitialized();
-        Play(_losePlayer, SystemSounds.Question);
-    }
+    public static void PlayLose() => PlayOneShot("lose.wav");
 
     public static void StartBackgroundLoop()
     {
-        EnsureInitialized();
-        try
+        lock (SyncLock)
         {
-            _backgroundPlayer?.PlayLooping();
-        }
-        catch
-        {
+            if (_backgroundOutput is not null)
+            {
+                if (_backgroundOutput.PlaybackState != PlaybackState.Playing)
+                {
+                    _backgroundOutput.Play();
+                }
+
+                return;
+            }
+
+            var path = GetPath("backGame.wav");
+            if (path is null)
+            {
+                return;
+            }
+
+            try
+            {
+                _backgroundReader = new AudioFileReader(path) { Volume = 0.18f };
+                _backgroundLoop = new LoopStream(_backgroundReader);
+                _backgroundOutput = new WaveOutEvent();
+                _backgroundOutput.Init(_backgroundLoop);
+                _backgroundOutput.Play();
+            }
+            catch
+            {
+                DisposeBackground();
+            }
         }
     }
 
     public static void StopBackgroundLoop()
     {
-        try
+        lock (SyncLock)
         {
-            _backgroundPlayer?.Stop();
-        }
-        catch
-        {
+            DisposeBackground();
         }
     }
 
-    private static void EnsureInitialized()
+    private static void PlayOneShot(string fileName)
     {
-        if (_initialized)
+        var path = GetPath(fileName);
+        if (path is null)
         {
             return;
         }
 
-        lock (SyncLock)
+        _ = Task.Run(() =>
         {
-            if (_initialized)
+            try
             {
-                return;
+                var reader = new AudioFileReader(path);
+                var output = new WaveOutEvent();
+                output.Init(reader);
+                output.PlaybackStopped += (_, _) =>
+                {
+                    output.Dispose();
+                    reader.Dispose();
+                };
+                output.Play();
             }
-
-            _buttonPlayer = TryLoad("button_click.wav");
-            _cardPlayer = TryLoad("card_play.wav");
-            _drawPlayer = TryLoad("card_draw.wav");
-            _errorPlayer = TryLoad("error.wav");
-            _winPlayer = TryLoad("win.wav");
-            _losePlayer = TryLoad("lose.wav");
-            _backgroundPlayer = TryLoad("background_loop.wav");
-            _initialized = true;
-        }
+            catch
+            {
+            }
+        });
     }
 
-    private static SoundPlayer? TryLoad(string fileName)
+    private static string? GetPath(string fileName)
+    {
+        var path = Path.Combine(SoundRoot, fileName);
+        return File.Exists(path) ? path : null;
+    }
+
+    private static void DisposeBackground()
     {
         try
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "Assets", "Sounds", fileName);
-            if (!File.Exists(path))
-            {
-                return null;
-            }
-
-            var player = new SoundPlayer(path);
-            player.LoadAsync();
-            return player;
+            _backgroundOutput?.Stop();
         }
         catch
         {
-            return null;
         }
+
+        _backgroundOutput?.Dispose();
+        _backgroundLoop?.Dispose();
+        _backgroundReader?.Dispose();
+        _backgroundOutput = null;
+        _backgroundLoop = null;
+        _backgroundReader = null;
     }
 
-    private static void Play(SoundPlayer? player, SystemSound fallback)
+    private sealed class LoopStream : WaveStream
     {
-        try
+        private readonly WaveStream _sourceStream;
+
+        public LoopStream(WaveStream sourceStream)
         {
-            if (player is not null)
+            _sourceStream = sourceStream;
+        }
+
+        public override WaveFormat WaveFormat => _sourceStream.WaveFormat;
+
+        public override long Length => long.MaxValue;
+
+        public override long Position
+        {
+            get => _sourceStream.Position;
+            set => _sourceStream.Position = value;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var totalBytesRead = 0;
+
+            while (totalBytesRead < count)
             {
-                player.Play();
-                return;
+                var bytesRead = _sourceStream.Read(buffer, offset + totalBytesRead, count - totalBytesRead);
+                if (bytesRead == 0)
+                {
+                    _sourceStream.Position = 0;
+                    bytesRead = _sourceStream.Read(buffer, offset + totalBytesRead, count - totalBytesRead);
+                    if (bytesRead == 0)
+                    {
+                        break;
+                    }
+                }
+
+                totalBytesRead += bytesRead;
             }
 
-            fallback.Play();
-        }
-        catch
-        {
+            return totalBytesRead;
         }
     }
 }

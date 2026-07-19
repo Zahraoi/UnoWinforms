@@ -41,9 +41,9 @@ public sealed class DecorativeUnoPanel : Panel
                 var availableHeight = maxHeight - pad * 2;
 
                 // "Contain" behavior — use Math.Min so the entire image always fits
-                // without any cropping, occupying ~80-85% of the available area
-                var targetWidth = availableWidth * 0.85f;
-                var targetHeight = availableHeight * 0.85f;
+                // without any cropping, occupying ~90-95% of the available area
+                var targetWidth = availableWidth * 0.95f;
+                var targetHeight = availableHeight * 0.95f;
 
                 var scaleX = targetWidth / _illustration.Width;
                 var scaleY = targetHeight / _illustration.Height;

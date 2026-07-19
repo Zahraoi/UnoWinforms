@@ -25,6 +25,7 @@ public sealed class StartupForm : Form
     // Single-window navigation: one root content panel swaps children
     private readonly DoubleBufferedPanel _contentPanel = new();
     private Control? _startBackground; // cached reference to startup background panel
+    private Control? _welcomeBackground;
     private GameForm? _activeGame;     // currently embedded game screen
 
     protected override CreateParams CreateParams
@@ -61,6 +62,7 @@ public sealed class StartupForm : Form
         Controls.Add(_contentPanel);
         
         BuildLayout();
+        BuildWelcomeScreen();
         
         AddPlayerRow("Player 1", PlayerType.Human, false);
         AddPlayerRow("Player 2", PlayerType.SmartComputer, false);
@@ -191,7 +193,77 @@ public sealed class StartupForm : Form
         var background = new PastelBackgroundPanel { Dock = DockStyle.Fill };
         background.Controls.Add(shell);
         _startBackground = background; // cache for re-showing later
-        _contentPanel.Controls.Add(background);
+    }
+
+    private void BuildWelcomeScreen()
+    {
+        var imagePath = Path.Combine(AppContext.BaseDirectory, "Assets", "Background", "backgroundImage.jpeg");
+
+        var welcomePanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Black,
+            BackgroundImageLayout = ImageLayout.Stretch
+        };
+
+        if (File.Exists(imagePath))
+        {
+            welcomePanel.BackgroundImage = Image.FromFile(imagePath);
+        }
+
+        var overlay = new DoubleBufferedTableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 4,
+            BackColor = Color.Transparent,
+            Padding = new Padding(32)
+        };
+        overlay.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
+        overlay.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60));
+        overlay.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
+        overlay.RowStyles.Add(new RowStyle(SizeType.Percent, 74));
+        overlay.RowStyles.Add(new RowStyle(SizeType.Percent, 14));
+        overlay.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        overlay.RowStyles.Add(new RowStyle(SizeType.Percent, 12));
+
+        var startButton = new ModernButton
+        {
+            Text = "▶ Start Game",
+            Dock = DockStyle.None,
+            Anchor = AnchorStyles.None,
+            Size = new Size(240, 72),
+            Margin = new Padding(0, 36, 0, 0),
+            IsGradient = true,
+            Font = new Font(UnoTheme.TextFontFamily, 18f, FontStyle.Bold)
+        };
+        startButton.Click += (_, _) => ShowPlayerSetupScreen();
+
+        overlay.Controls.Add(startButton, 1, 2);
+        welcomePanel.Controls.Add(overlay);
+
+        _welcomeBackground = welcomePanel;
+        _contentPanel.Controls.Add(welcomePanel);
+    }
+
+    private void ShowPlayerSetupScreen()
+    {
+        SuspendLayout();
+        _contentPanel.SuspendLayout();
+
+        if (_welcomeBackground is not null && _contentPanel.Controls.Contains(_welcomeBackground))
+        {
+            _contentPanel.Controls.Remove(_welcomeBackground);
+        }
+
+        if (_startBackground is not null && !_contentPanel.Controls.Contains(_startBackground))
+        {
+            _contentPanel.Controls.Add(_startBackground);
+        }
+
+        _contentPanel.ResumeLayout(true);
+        ResumeLayout(true);
+        SyncPlayerRowsLayout();
     }
 
     private static ModernButton CreateTinyButton(string text, int x, int y, Color backColor, Color foreColor) => 

@@ -74,7 +74,7 @@ public sealed class UnoCardControl : Control
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        
+
         var cardBounds = new Rectangle(6, _animatedOffsetY, Width - 12, Height - 16);
 
         // Soft shadow (12% opacity, 20 blur effect approx)

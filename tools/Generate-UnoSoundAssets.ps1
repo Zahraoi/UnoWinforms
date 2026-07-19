@@ -201,9 +201,7 @@ function New-SoftLoopWav {
 }
 
 New-Wav -Path (Join-Path $soundDir 'button_click.wav') -Frequency 880 -DurationMs 70
-New-CardStyleWav -Path (Join-Path $soundDir 'card_play.wav') -DurationMs 82 -Impact 0.40 -Rustle 0.12 -BodyFrequency 175 -BodyAmount 0.08
 New-CardStyleWav -Path (Join-Path $soundDir 'card_draw.wav') -DurationMs 108 -Impact 0.20 -Rustle 0.18 -BodyFrequency 145 -BodyAmount 0.06
 New-Wav -Path (Join-Path $soundDir 'error.wav') -Frequency 240 -DurationMs 150
 New-Wav -Path (Join-Path $soundDir 'win.wav') -Frequency 1040 -DurationMs 180
 New-Wav -Path (Join-Path $soundDir 'lose.wav') -Frequency 180 -DurationMs 220
-New-SoftLoopWav -Path (Join-Path $soundDir 'background_loop.wav') -DurationMs 10000
