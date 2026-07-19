@@ -8,17 +8,18 @@ public class RoundedPanel : Panel
 {
     public RoundedPanel()
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         BackColor = Color.Transparent;
+        BorderStyle = BorderStyle.None; // Ensure no WinForms borders
     }
 
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public int CornerRadius { get; set; } = 22;
+    public int CornerRadius { get; set; } = 20;
 
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public Color FillColor { get; set; } = UnoTheme.Surface;
+    public Color FillColor { get; set; } = Color.White;
 
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -27,29 +28,40 @@ public class RoundedPanel : Panel
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int BorderThickness { get; set; } = 1;
+    
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool HasShadow { get; set; } = true;
 
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        var canvasColor = Parent is RoundedPanel roundedParent
-            ? roundedParent.FillColor
-            : Parent?.BackColor ?? UnoTheme.AppBackground;
-        e.Graphics.Clear(canvasColor);
 
-        var shadowBounds = new Rectangle(4, 6, Width - 9, Height - 10);
-        using (var shadowPath = UnoTheme.CreateRoundedPath(shadowBounds, CornerRadius))
-        using (var shadowBrush = new SolidBrush(UnoTheme.Shadow))
+        int shadowSize = HasShadow ? 6 : 0;
+        var bounds = new Rectangle(shadowSize, shadowSize, Width - shadowSize * 2 - 1, Height - shadowSize * 2 - 1);
+        
+        using var path = UnoTheme.CreateRoundedPath(bounds, CornerRadius);
+
+        if (HasShadow)
         {
+            using var shadowPath = UnoTheme.CreateRoundedPath(new Rectangle(bounds.X + 2, bounds.Y + 4, bounds.Width, bounds.Height), CornerRadius);
+            // Extremely soft, very transparent shadow to prevent dark edges
+            using var shadowBrush = new SolidBrush(Color.FromArgb(8, 0, 0, 0));
             e.Graphics.FillPath(shadowBrush, shadowPath);
+            
+            using var shadowPath2 = UnoTheme.CreateRoundedPath(new Rectangle(bounds.X + 1, bounds.Y + 2, bounds.Width, bounds.Height), CornerRadius);
+            using var shadowBrush2 = new SolidBrush(Color.FromArgb(12, 0, 0, 0));
+            e.Graphics.FillPath(shadowBrush2, shadowPath2);
         }
 
-        var bounds = new Rectangle(0, 0, Width - 5, Height - 7);
-        using var path = UnoTheme.CreateRoundedPath(bounds, CornerRadius);
-        using var brush = new SolidBrush(FillColor);
-        using var pen = new Pen(BorderColor, BorderThickness);
+        using var fillBrush = new SolidBrush(FillColor);
+        e.Graphics.FillPath(fillBrush, path);
 
-        e.Graphics.FillPath(brush, path);
-        e.Graphics.DrawPath(pen, path);
-        base.OnPaint(e);
+        if (BorderThickness > 0)
+        {
+            // Strict 1px #ECECEC border, NO black lines
+            using var pen = new Pen(BorderColor, BorderThickness);
+            e.Graphics.DrawPath(pen, path);
+        }
     }
 }
