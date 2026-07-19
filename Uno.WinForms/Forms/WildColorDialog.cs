@@ -1,5 +1,6 @@
 using Uno.Core.Cards;
 using Uno.WinForms.Controls;
+using Uno.WinForms.Services;
 using Uno.WinForms.Ui;
 
 namespace Uno.WinForms.Forms;
@@ -13,7 +14,7 @@ public sealed class WildColorDialog : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(440, 220);
+        ClientSize = new Size(540, 220);
         BackColor = UnoTheme.AppBackground;
 
         var shell = new RoundedPanel
@@ -42,35 +43,45 @@ public sealed class WildColorDialog : Form
             ForeColor = UnoTheme.MutedInk
         };
 
-        var flow = new FlowLayoutPanel
+        var colorGrid = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             Padding = new Padding(0, 16, 0, 0),
-            BackColor = Color.Transparent
+            BackColor = Color.Transparent,
+            ColumnCount = 4,
+            RowCount = 1
         };
+        colorGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        colorGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        colorGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        colorGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
 
-        foreach (var color in new[] { CardColor.Red, CardColor.Yellow, CardColor.Green, CardColor.Blue })
+        var colors = new[] { CardColor.Red, CardColor.Yellow, CardColor.Green, CardColor.Blue };
+        for (var index = 0; index < colors.Length; index++)
         {
+            var color = colors[index];
             var tile = new Button
             {
                 Text = color.ToString(),
                 Size = new Size(88, 88),
+                Dock = DockStyle.Fill,
                 BackColor = UnoTheme.GetCardColor(color),
                 ForeColor = UnoTheme.GetCardInk(color),
                 Font = new Font(UnoTheme.BodyFont, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 0, 16, 0)
+                Margin = index == colors.Length - 1 ? Padding.Empty : new Padding(0, 0, 12, 0)
             };
             tile.FlatAppearance.BorderSize = 0;
             tile.Click += (_, _) =>
             {
+                SoundService.PlayButtonClick();
                 SelectedColor = color;
                 DialogResult = DialogResult.OK;
             };
-            flow.Controls.Add(tile);
+            colorGrid.Controls.Add(tile, index, 0);
         }
 
-        shell.Controls.Add(flow);
+        shell.Controls.Add(colorGrid);
         shell.Controls.Add(note);
         shell.Controls.Add(title);
         Controls.Add(shell);

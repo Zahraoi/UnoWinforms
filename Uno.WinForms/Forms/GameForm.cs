@@ -104,16 +104,16 @@ public sealed class GameForm : Form
             Margin = new Padding(0, 0, 24, 0)
         };
         
-        sidebar.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Art
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 200)); // Draw
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 200)); // Discard
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 170)); // Art
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 180)); // Draw
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 180)); // Discard
         sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Spacer
         sidebar.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // End Game
         sidebar.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // New Game
         sidebar.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Footer
 
         // 1. Art - Natively on background
-        var art = new DecorativeUnoPanel { Dock = DockStyle.Top, Height = 280, Margin = new Padding(0, 0, 0, 24) };
+        var art = new DecorativeUnoPanel { Dock = DockStyle.Fill, Height = 160, Margin = new Padding(0, 0, 0, 16) };
         sidebar.Controls.Add(art, 0, 0);
 
         // 2. Draw Pile
@@ -139,17 +139,17 @@ public sealed class GameForm : Form
         sidebar.Controls.Add(new Panel { Dock = DockStyle.Fill }, 0, 3);
 
         // 5. End Game
-        var endBtn = new ModernButton { Text = "⏻   End Game", Dock = DockStyle.Top, Height = 56, Margin = new Padding(0, 0, 0, 16), IsGradient = true };
+        var endBtn = new ModernButton { Text = "⏻   End Game", Dock = DockStyle.Top, Height = 52, Margin = new Padding(0, 0, 0, 12), IsGradient = true };
         endBtn.Click += (_, _) => (NavigateBack ?? Close)();
         sidebar.Controls.Add(endBtn, 0, 4);
 
         // 6. New Game
-        var newBtn = new ModernButton { Text = "+   New Game", Dock = DockStyle.Top, Height = 56, Margin = new Padding(0, 0, 0, 24), AccentColor = UnoTheme.PrimaryPurple, BackColor = Color.White, ForeColor = UnoTheme.PrimaryPurple };
+        var newBtn = new ModernButton { Text = "+   New Game", Dock = DockStyle.Top, Height = 52, Margin = new Padding(0, 0, 0, 16), AccentColor = UnoTheme.PrimaryPurple, BackColor = Color.White, ForeColor = UnoTheme.PrimaryPurple };
         newBtn.Click += (_, _) => (NavigateBack ?? Close)();
         sidebar.Controls.Add(newBtn, 0, 5);
         
         // 7. Footer
-        var footer = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Top, Height = 50, ColumnCount = 2, RowCount = 1, BackColor = Color.Transparent, Margin = new Padding(0) };
+        var footer = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 2, RowCount = 1, BackColor = Color.Transparent, Margin = new Padding(0) };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         var helpBtn = new ModernButton
@@ -163,6 +163,11 @@ public sealed class GameForm : Form
             Font = new Font(UnoTheme.TextFontFamily, 11f, FontStyle.Regular),
             CornerRadius = 16
         };
+        helpBtn.Click += (_, _) =>
+        {
+            using var helpForm = new HelpForm();
+            helpForm.ShowDialog(this.TopLevelControl as Form ?? this);
+        };
         var aboutBtn = new ModernButton
         {
             Text = "ⓘ About",
@@ -173,6 +178,11 @@ public sealed class GameForm : Form
             AccentColor = UnoTheme.Border,
             Font = new Font(UnoTheme.TextFontFamily, 11f, FontStyle.Regular),
             CornerRadius = 16
+        };
+        aboutBtn.Click += (_, _) =>
+        {
+            using var aboutForm = new AboutForm();
+            aboutForm.ShowDialog(this.TopLevelControl as Form ?? this);
         };
         footer.Controls.Add(helpBtn, 0, 0);
         footer.Controls.Add(aboutBtn, 1, 0);
@@ -297,8 +307,18 @@ public sealed class GameForm : Form
     {
         if (result.Status != MoveStatus.Success)
         {
+            SoundService.PlayError();
             RefreshBoard();
             return;
+        }
+
+        if (result.PlayedCard is not null)
+        {
+            SoundService.PlayCardPlay();
+        }
+        else if (result.DrawnCards.Count > 0)
+        {
+            SoundService.PlayCardDraw();
         }
 
         RefreshBoard();
@@ -344,6 +364,19 @@ public sealed class GameForm : Form
         var persistenceMessage = _persistenceService.DatabaseAvailable
             ? "Match results were saved to SQL Server."
             : _persistenceService.StatusMessage;
+
+        var winner = _session.GetOrderedResults().FirstOrDefault();
+        if (winner is not null)
+        {
+            if (winner.Definition.Type == PlayerType.Human)
+            {
+                SoundService.PlayWin();
+            }
+            else
+            {
+                SoundService.PlayLose();
+            }
+        }
 
         using var resultsForm = new ResultsForm(_session, persistenceMessage);
         resultsForm.ShowDialog(this.TopLevelControl as Form ?? this);

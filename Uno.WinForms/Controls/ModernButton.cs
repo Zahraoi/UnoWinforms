@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
+using Uno.WinForms.Services;
 using Uno.WinForms.Ui;
 
 namespace Uno.WinForms.Controls;
@@ -79,5 +80,11 @@ public class ModernButton : Control
 
         TextRenderer.DrawText(e.Graphics, Text, Font, bounds, IsGradient ? Color.White : ForeColor,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+    }
+
+    protected override void OnClick(EventArgs e)
+    {
+        SoundService.PlayButtonClick();
+        base.OnClick(e);
     }
 }

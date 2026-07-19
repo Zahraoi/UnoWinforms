@@ -1,6 +1,7 @@
 using Uno.Core.Game;
 using Uno.Core.Services;
 using Uno.WinForms.Controls;
+using Uno.WinForms.Services;
 using Uno.WinForms.Ui;
 
 namespace Uno.WinForms.Forms;
@@ -83,7 +84,11 @@ public sealed class ResultsForm : Form
 
         var closeButton = new Button { Text = "Close", Size = new Size(110, 36) };
         UnoTheme.ApplyPrimaryButton(closeButton);
-        closeButton.Click += (_, _) => Close();
+        closeButton.Click += (_, _) =>
+        {
+            SoundService.PlayButtonClick();
+            Close();
+        };
 
         var persistenceLabel = new Label
         {

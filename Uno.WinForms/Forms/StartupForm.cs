@@ -19,6 +19,7 @@ public sealed class StartupForm : Form
     private readonly DoubleBufferedTableLayoutPanel _shellLayout = new();
     private readonly DecorativeUnoPanel _artPanel = new();
     private readonly DoubleBufferedTableLayoutPanel _rightLayout = new();
+    private readonly DoubleBufferedPanel _playerRowsViewport = new();
     private GameOptions _options = new();
 
     // Single-window navigation: one root content panel swaps children
@@ -77,8 +78,6 @@ public sealed class StartupForm : Form
         shell.Padding = new Padding(40, 32, 40, 40);
         shell.BackColor = Color.Transparent;
         shell.AutoScroll = false;
-        shell.AutoSize = true;
-        shell.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30)); // 30% left panel
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70)); // 70% right panel
 
@@ -92,10 +91,8 @@ public sealed class StartupForm : Form
         right.ColumnCount = 1;
         right.RowCount = 3;
         right.BackColor = Color.Transparent;
-        right.AutoSize = true;
-        right.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        right.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // AutoSize to allow dynamic player growth without clipping
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         var header = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, RowCount = 1, BackColor = Color.Transparent, Margin = new Padding(0, 0, 0, 24) };
@@ -140,23 +137,28 @@ public sealed class StartupForm : Form
         countCard.Controls.AddRange([lblNum, minusBtn, _numPlayersValueLabel, plusBtn]);
         header.Controls.Add(countCard, 1, 0);
 
-        var playersCard = new RoundedPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FillColor = Color.White, CornerRadius = 24, Padding = new Padding(32) };
-        var playersCardLayout = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, RowCount = 2, BackColor = Color.Transparent };
+        var playersCard = new RoundedPanel { Dock = DockStyle.Fill, FillColor = Color.White, CornerRadius = 24, Padding = new Padding(32) };
+        var playersCardLayout = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, BackColor = Color.Transparent };
         playersCardLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        playersCardLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        playersCardLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         
         var playersTitle = new Label { Text = "👥 PLAYERS", AutoSize = true, Font = UnoTheme.HeadingFont, ForeColor = UnoTheme.PrimaryPurple, Margin = new Padding(0, 0, 0, 16), BackColor = Color.White };
         
-        _playerRowsPanel.Dock = DockStyle.Top;
+        _playerRowsViewport.Dock = DockStyle.Fill;
+        _playerRowsViewport.AutoScroll = true;
+        _playerRowsViewport.BackColor = Color.Transparent;
+        _playerRowsViewport.Padding = new Padding(0, 0, 8, 0);
+
+        _playerRowsPanel.Dock = DockStyle.None;
         _playerRowsPanel.FlowDirection = FlowDirection.TopDown;
         _playerRowsPanel.WrapContents = false;
         _playerRowsPanel.AutoScroll = false;
-        _playerRowsPanel.AutoSize = true;
-        _playerRowsPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         _playerRowsPanel.BackColor = Color.Transparent;
+        _playerRowsPanel.Location = new Point(0, 0);
         
         playersCardLayout.Controls.Add(playersTitle, 0, 0);
-        playersCardLayout.Controls.Add(_playerRowsPanel, 0, 1);
+        _playerRowsViewport.Controls.Add(_playerRowsPanel);
+        playersCardLayout.Controls.Add(_playerRowsViewport, 0, 1);
         playersCard.Controls.Add(playersCardLayout);
 
         var footerLayout = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Bottom, Height = 60, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 24, 0, 0) };
@@ -168,7 +170,11 @@ public sealed class StartupForm : Form
         optionsButton.Click += (_, _) => EditOptions();
         
         var aboutButton = new ModernButton { Text = "ⓘ About", Dock = DockStyle.Fill, Margin = new Padding(12, 0, 12, 0), AccentColor = UnoTheme.Blue };
-        aboutButton.Click += (_, _) => MessageBox.Show(this, "UNO WinForms\nA modern desktop UNO game.", "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        aboutButton.Click += (_, _) =>
+        {
+            using var aboutForm = new AboutForm();
+            aboutForm.ShowDialog(this);
+        };
         
         var startButton = new ModernButton { Text = "▶ Start Game", Dock = DockStyle.Fill, Margin = new Padding(12, 0, 0, 0), IsGradient = true };
         startButton.Click += (_, _) => StartMatch();
@@ -182,7 +188,7 @@ public sealed class StartupForm : Form
         right.Controls.Add(footerLayout, 0, 2);
         shell.Controls.Add(right, 1, 0);
         
-        var background = new PastelBackgroundPanel { Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+        var background = new PastelBackgroundPanel { Dock = DockStyle.Fill };
         background.Controls.Add(shell);
         _startBackground = background; // cache for re-showing later
         _contentPanel.Controls.Add(background);
@@ -202,6 +208,8 @@ public sealed class StartupForm : Form
         var row = new PlayerSetupRowControl(_playerRowsPanel.Controls.Count + 1, name, playerType, removable) { Margin = new Padding(0, 0, 0, 16) };
         _playerRowsPanel.Controls.Add(row);
         SyncPlayerRowsLayout();
+        _playerRowsViewport.ScrollControlIntoView(row);
+        _playerRowsViewport.VerticalScroll.Value = _playerRowsViewport.VerticalScroll.Maximum;
         
         _shellLayout.ResumeLayout(true);
         _playerRowsPanel.ResumeLayout(true);
@@ -230,12 +238,15 @@ public sealed class StartupForm : Form
 
     private void SyncPlayerRowsLayout()
     {
-        if (_playerRowsPanel.ClientSize.Width <= 0) return;
-        var availableWidth = _playerRowsPanel.ClientSize.Width;
+        if (_playerRowsViewport.ClientSize.Width <= 0) return;
+        var availableWidth = Math.Max(0, _playerRowsViewport.ClientSize.Width - 8);
         foreach (var row in _playerRowsPanel.Controls.OfType<PlayerSetupRowControl>()) 
         {
             row.Width = availableWidth;
         }
+        var totalHeight = _playerRowsPanel.Controls.OfType<Control>().Sum(control => control.Height + control.Margin.Vertical);
+        _playerRowsPanel.Size = new Size(availableWidth, totalHeight + 4);
+        _playerRowsViewport.AutoScrollMinSize = new Size(0, totalHeight + 8);
         UpdateNumPlayersValue();
     }
     
@@ -265,10 +276,20 @@ public sealed class StartupForm : Form
         var players = new List<PlayerDefinition>();
         foreach (var control in _playerRowsPanel.Controls.OfType<PlayerSetupRowControl>())
         {
-            if (!control.IsValid(out var message)) { MessageBox.Show(this, message, "Invalid Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (!control.IsValid(out var message))
+            {
+                SoundService.PlayError();
+                MessageBox.Show(this, message, "Invalid Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             players.Add(new PlayerDefinition(control.PlayerName, control.PlayerType));
         }
-        if (players.Count < 2 || players.Count > 4) { MessageBox.Show(this, "Choose between 2 and 4 players.", "Invalid Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+        if (players.Count < 2 || players.Count > 4)
+        {
+            SoundService.PlayError();
+            MessageBox.Show(this, "Choose between 2 and 4 players.", "Invalid Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
         
         var session = _ruleEngine.StartNewGame(players, _options.Clone());
         NavigateToGame(session);

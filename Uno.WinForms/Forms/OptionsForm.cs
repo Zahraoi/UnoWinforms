@@ -1,5 +1,6 @@
 using Uno.Core.Game;
 using Uno.WinForms.Controls;
+using Uno.WinForms.Services;
 using Uno.WinForms.Ui;
 
 namespace Uno.WinForms.Forms;
@@ -123,11 +124,19 @@ public sealed class OptionsForm : Form
 
         var saveButton = new Button { Text = "Save", Size = new Size(110, 36) };
         UnoTheme.ApplyPrimaryButton(saveButton);
-        saveButton.Click += (_, _) => SaveAndClose();
+        saveButton.Click += (_, _) =>
+        {
+            SoundService.PlayButtonClick();
+            SaveAndClose();
+        };
 
         var cancelButton = new Button { Text = "Cancel", Size = new Size(110, 36) };
         UnoTheme.ApplySecondaryButton(cancelButton);
-        cancelButton.Click += (_, _) => DialogResult = DialogResult.Cancel;
+        cancelButton.Click += (_, _) =>
+        {
+            SoundService.PlayButtonClick();
+            DialogResult = DialogResult.Cancel;
+        };
 
         buttonBar.Controls.Add(saveButton);
         buttonBar.Controls.Add(cancelButton);

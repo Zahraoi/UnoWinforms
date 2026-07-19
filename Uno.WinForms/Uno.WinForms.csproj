@@ -17,6 +17,9 @@
     <Content Include="Assets\Cards\*.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Assets\Sounds\*.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Assets\Images\*.png" Condition="Exists('Assets\Images')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
