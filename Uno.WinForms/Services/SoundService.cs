@@ -11,6 +11,7 @@ public static class SoundService
     private static SoundPlayer? _errorPlayer;
     private static SoundPlayer? _winPlayer;
     private static SoundPlayer? _losePlayer;
+    private static SoundPlayer? _backgroundPlayer;
     private static bool _initialized;
 
     public static void PlayButtonClick()
@@ -49,6 +50,29 @@ public static class SoundService
         Play(_losePlayer, SystemSounds.Question);
     }
 
+    public static void StartBackgroundLoop()
+    {
+        EnsureInitialized();
+        try
+        {
+            _backgroundPlayer?.PlayLooping();
+        }
+        catch
+        {
+        }
+    }
+
+    public static void StopBackgroundLoop()
+    {
+        try
+        {
+            _backgroundPlayer?.Stop();
+        }
+        catch
+        {
+        }
+    }
+
     private static void EnsureInitialized()
     {
         if (_initialized)
@@ -69,6 +93,7 @@ public static class SoundService
             _errorPlayer = TryLoad("error.wav");
             _winPlayer = TryLoad("win.wav");
             _losePlayer = TryLoad("lose.wav");
+            _backgroundPlayer = TryLoad("background_loop.wav");
             _initialized = true;
         }
     }

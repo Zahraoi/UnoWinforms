@@ -62,6 +62,7 @@ public sealed class GameForm : Form
         ResizeEnd += (_, _) => ResumeLayout(true);
 
         BuildLayout();
+        SoundService.StartBackgroundLoop();
         RefreshBoard();
         TriggerComputerTurnIfNeeded();
     }
@@ -69,6 +70,7 @@ public sealed class GameForm : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         _computerTimer.Stop();
+        SoundService.StopBackgroundLoop();
         base.OnFormClosed(e);
     }
 
