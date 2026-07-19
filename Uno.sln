@@ -9,8 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Uno.Data", "Uno.Data\Uno.Da
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Uno.WinForms", "Uno.WinForms\Uno.WinForms.csproj", "{421C574A-BABC-4B94-ABA5-E08BD2706148}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Uno.Tests", "Uno.Tests\Uno.Tests.csproj", "{8F5A0D9B-8129-4EBD-89D6-69A868E51910}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,18 +55,6 @@ Global
 		{421C574A-BABC-4B94-ABA5-E08BD2706148}.Release|x64.Build.0 = Release|Any CPU
 		{421C574A-BABC-4B94-ABA5-E08BD2706148}.Release|x86.ActiveCfg = Release|Any CPU
 		{421C574A-BABC-4B94-ABA5-E08BD2706148}.Release|x86.Build.0 = Release|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Debug|x64.Build.0 = Debug|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Debug|x86.Build.0 = Debug|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Release|x64.ActiveCfg = Release|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Release|x64.Build.0 = Release|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Release|x86.ActiveCfg = Release|Any CPU
-		{8F5A0D9B-8129-4EBD-89D6-69A868E51910}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

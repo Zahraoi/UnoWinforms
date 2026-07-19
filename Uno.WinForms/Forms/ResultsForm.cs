@@ -6,106 +6,26 @@ using Uno.WinForms.Ui;
 
 namespace Uno.WinForms.Forms;
 
-public sealed class ResultsForm : Form
+public sealed partial class ResultsForm : Form
 {
     public ResultsForm(GameSession session, string persistenceMessage)
     {
-        Text = "Match Results";
-        StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(860, 640);
-        BackColor = UnoTheme.AppBackground;
-
-        BuildLayout(session, persistenceMessage);
+        InitializeComponent();
+        PopulateResults(session, persistenceMessage);
     }
 
-    private void BuildLayout(GameSession session, string persistenceMessage)
+    private void PopulateResults(GameSession session, string persistenceMessage)
     {
-        var shell = new RoundedPanel
-        {
-            Dock = DockStyle.Fill,
-            FillColor = UnoTheme.Surface,
-            BorderColor = UnoTheme.Border,
-            Padding = new Padding(24)
-        };
-
         var winner = session.GetOrderedResults().First();
-        var banner = new RoundedPanel
-        {
-            Dock = DockStyle.Top,
-            Height = 116,
-            FillColor = UnoTheme.Accent,
-            BorderColor = UnoTheme.AccentDark,
-            Padding = new Padding(24)
-        };
+        winnerTitleLabel.Text = $"Winner: {winner.Definition.Name}";
+        winnerSubLabel.Text = $"{winner.Definition.Type} finished rank 1 with score {ScoringService.CalculateScore(winner, session)}.";
+        persistenceLabel.Text = persistenceMessage;
 
-        var winnerTitle = new Label
-        {
-            Text = $"Winner: {winner.Definition.Name}",
-            ForeColor = Color.White,
-            Font = UnoTheme.TitleFont,
-            Dock = DockStyle.Top,
-            Height = 48
-        };
-
-        var winnerSub = new Label
-        {
-            Text = $"{winner.Definition.Type} finished rank 1 with score {ScoringService.CalculateScore(winner, session)}.",
-            ForeColor = Color.FromArgb(255, 238, 238),
-            Font = UnoTheme.BodyFont,
-            Dock = DockStyle.Top,
-            Height = 26
-        };
-
-        banner.Controls.Add(winnerSub);
-        banner.Controls.Add(winnerTitle);
-
-        var rowsPanel = new DoubleBufferedFlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            AutoScroll = true,
-            BackColor = Color.Transparent,
-            Padding = new Padding(2, 18, 2, 12)
-        };
-
+        rowsPanel.Controls.Clear();
         foreach (var player in session.GetOrderedResults())
         {
             rowsPanel.Controls.Add(CreateResultRow(player, session));
         }
-
-        var footer = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Bottom,
-            Height = 48,
-            FlowDirection = FlowDirection.RightToLeft,
-            BackColor = Color.Transparent
-        };
-
-        var closeButton = new Button { Text = "Close", Size = new Size(110, 36) };
-        UnoTheme.ApplyPrimaryButton(closeButton);
-        closeButton.Click += (_, _) =>
-        {
-            SoundService.PlayButtonClick();
-            Close();
-        };
-
-        var persistenceLabel = new Label
-        {
-            Text = persistenceMessage,
-            AutoSize = true,
-            Font = UnoTheme.SmallFont,
-            ForeColor = UnoTheme.MutedInk,
-            Padding = new Padding(0, 10, 14, 0)
-        };
-
-        footer.Controls.Add(closeButton);
-        footer.Controls.Add(persistenceLabel);
-
-        shell.Controls.Add(rowsPanel);
-        shell.Controls.Add(footer);
-        shell.Controls.Add(banner);
-        Controls.Add(shell);
     }
 
     private static Control CreateResultRow(GamePlayer player, GameSession session)
@@ -141,5 +61,11 @@ public sealed class ResultsForm : Form
         row.Controls.Add(metrics);
         row.Controls.Add(left);
         return row;
+    }
+
+    private void closeButton_Click(object? sender, EventArgs e)
+    {
+        SoundService.PlayButtonClick();
+        Close();
     }
 }
