@@ -3,63 +3,86 @@ using Uno.WinForms.Ui;
 
 namespace Uno.WinForms.Controls;
 
-public sealed class PlayerSetupRowControl : Panel
+public sealed class PlayerSetupRowControl : RoundedPanel
 {
-    private readonly TextBox _nameTextBox = new();
-    private readonly ComboBox _typeComboBox = new();
-    private readonly Button _removeButton = new();
+    private readonly ModernTextBox _nameTextBox = new();
+    private readonly ModernComboBox _typeComboBox = new();
 
     public PlayerSetupRowControl(int slotNumber, string name, PlayerType playerType, bool removable)
     {
-        DoubleBuffered = true;
-        Height = 86;
-        Width = 780;
-        BackColor = Color.White;
-        BorderStyle = BorderStyle.FixedSingle;
-        Padding = new Padding(16, 12, 16, 12);
+        Height = 120;
+        FillColor = Color.White;
+        BorderColor = UnoTheme.Border; // #ECECEC
+        CornerRadius = 20;
+        HasShadow = true;
 
-        var slotLabel = new Label
-        {
-            Text = $"Player {slotNumber}",
-            Font = UnoTheme.BadgeFont,
+        var accent = slotNumber switch { 1 => UnoTheme.PrimaryPurple, 2 => UnoTheme.Accent, 3 => UnoTheme.Blue, _ => UnoTheme.Orange };
+        
+        var avatar = new AvatarControl 
+        { 
+            AccentColor = accent, 
+            Size = new Size(60, 60),
+            BackColor = Color.White
+        };
+        
+        _nameTextBox.Text = name;
+        _nameTextBox.Font = UnoTheme.PlayerNameFont;
+        _nameTextBox.BackColor = Color.White;
+        _nameTextBox.Dock = DockStyle.Fill;
+        _nameTextBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+
+        var typeLabel = new Label 
+        { 
+            Text = "Type", 
+            AutoSize = true, 
+            Font = UnoTheme.BodyFont, 
             ForeColor = UnoTheme.MutedInk,
-            AutoSize = true,
-            Location = new Point(16, 10)
+            BackColor = Color.White,
+            Anchor = AnchorStyles.Right
         };
 
-        _nameTextBox.Text = name;
-        _nameTextBox.Location = new Point(16, 34);
-        _nameTextBox.Size = new Size(360, 30);
-        UnoTheme.ApplyInput(_nameTextBox);
-
-        _typeComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _typeComboBox.Items.AddRange(Enum.GetNames<PlayerType>());
         _typeComboBox.SelectedItem = playerType.ToString();
-        _typeComboBox.Location = new Point(392, 34);
-        _typeComboBox.Size = new Size(220, 30);
-        UnoTheme.ApplyInput(_typeComboBox);
+        _typeComboBox.Size = new Size(160, 32);
+        _typeComboBox.Dock = DockStyle.Fill;
+        _typeComboBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
 
-        _removeButton.Text = "Remove";
-        _removeButton.Location = new Point(630, 32);
-        _removeButton.Size = new Size(110, 34);
-        _removeButton.Visible = removable;
-        _removeButton.Enabled = removable;
-        UnoTheme.ApplySecondaryButton(_removeButton);
-        _removeButton.Click += (_, _) => RemoveRequested?.Invoke(this, EventArgs.Empty);
+        var table = new DoubleBufferedTableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 5,
+            RowCount = 1,
+            BackColor = Color.Transparent,
+            Padding = new Padding(24, 0, 24, 0)
+        };
+        table.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        Controls.Add(slotLabel);
-        Controls.Add(_nameTextBox);
-        Controls.Add(_typeComboBox);
-        Controls.Add(_removeButton);
+        // Define responsive columns:
+        // Col 0: Avatar (fixed 72px width)
+        // Col 1: Player Name (Percent 100, fills middle area dynamically)
+        // Col 2: Spacer (24px)
+        // Col 3: "Type" label (AutoSize)
+        // Col 4: ComboBox (fixed 160px width)
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 72));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 24));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
+
+        // Align elements vertically in the cell center
+        avatar.Anchor = AnchorStyles.Left;
+        
+        table.Controls.Add(avatar, 0, 0);
+        table.Controls.Add(_nameTextBox, 1, 0);
+        // Column 2 is spacer
+        table.Controls.Add(typeLabel, 3, 0);
+        table.Controls.Add(_typeComboBox, 4, 0);
+
+        Controls.Add(table);
     }
 
-    public event EventHandler? RemoveRequested;
-
     public string PlayerName => _nameTextBox.Text.Trim();
-
-    public PlayerType PlayerType => Enum.TryParse<PlayerType>(_typeComboBox.SelectedItem?.ToString(), out var playerType)
-        ? playerType
-        : PlayerType.Human;
+    public PlayerType PlayerType => Enum.TryParse<PlayerType>(_typeComboBox.SelectedItem?.ToString(), out var playerType) ? playerType : PlayerType.Human;
 
     public bool IsValid(out string message)
     {
@@ -68,7 +91,6 @@ public sealed class PlayerSetupRowControl : Panel
             message = "Each player needs a name before the match can start.";
             return false;
         }
-
         message = string.Empty;
         return true;
     }

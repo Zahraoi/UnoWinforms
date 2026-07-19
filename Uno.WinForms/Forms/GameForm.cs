@@ -1,3 +1,4 @@
+using System.Drawing.Drawing2D;
 using Uno.Core.Cards;
 using Uno.Core.Game;
 using Uno.Core.Players;
@@ -14,18 +15,31 @@ public sealed class GameForm : Form
     private readonly RuleEngine _ruleEngine;
     private readonly ComputerPlayerService _computerPlayerService;
     private readonly GamePersistenceService _persistenceService;
-    private readonly TableLayoutPanel _seatPanel = new();
-    private readonly DoubleBufferedFlowLayoutPanel _handPanel = new();
-    private readonly Label _turnBannerLabel = new();
-    private readonly Label _statusLabel = new();
-    private readonly Label _currentColorLabel = new();
+    private readonly DoubleBufferedFlowLayoutPanel _mainPanel = new();
     private readonly UnoCardControl _discardCard = new();
     private readonly UnoCardControl _drawPileCard = new();
     private readonly Label _drawCountLabel = new();
-    private readonly Button _drawButton = new();
-    private readonly Button _closeButton = new();
+    private readonly Label _discardCountLabel = new();
     private readonly System.Windows.Forms.Timer _computerTimer = new();
     private bool _resultShown;
+    private readonly List<GamePlayerCardControl> _playerCards = [];
+
+    /// <summary>
+    /// When set, calling this action returns to the start screen instead of closing a window.
+    /// StartupForm sets this when embedding GameForm for single-window navigation.
+    /// </summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public Action? NavigateBack { get; set; }
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= 0x02000000; // WS_EX_COMPOSITED
+            return cp;
+        }
+    }
 
     public GameForm(GameSession session, RuleEngine ruleEngine, ComputerPlayerService computerPlayerService, GamePersistenceService persistenceService)
     {
@@ -34,14 +48,18 @@ public sealed class GameForm : Form
         _computerPlayerService = computerPlayerService;
         _persistenceService = persistenceService;
 
-        Text = "Uno Match";
+        Text = "UNO Game";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(1260, 820);
-        MinimumSize = new Size(1120, 760);
+        ClientSize = new Size(1400, 960);
+        MinimumSize = new Size(1200, 800);
         BackColor = UnoTheme.AppBackground;
         DoubleBuffered = true;
 
         _computerTimer.Tick += ComputerTimerOnTick;
+
+        // Suppress flicker during resize and maximize/restore
+        ResizeBegin += (_, _) => SuspendLayout();
+        ResizeEnd += (_, _) => ResumeLayout(true);
 
         BuildLayout();
         RefreshBoard();
@@ -56,416 +74,172 @@ public sealed class GameForm : Form
 
     private void BuildLayout()
     {
-        var root = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(18),
-            RowCount = 3,
-            BackColor = UnoTheme.AppBackground
-        };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 188));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 250));
-
-        root.Controls.Add(BuildHeaderPanel(), 0, 0);
-        root.Controls.Add(BuildBoardPanel(), 0, 1);
-        root.Controls.Add(BuildHandPanel(), 0, 2);
-        Controls.Add(root);
-    }
-
-    private Control BuildHeaderPanel()
-    {
-        var host = CreateSurfacePanel();
-        host.Padding = new Padding(16, 14, 16, 12);
-
-        var layout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 3,
-            BackColor = Color.Transparent
-        };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-
-        _turnBannerLabel.Dock = DockStyle.Fill;
-        _turnBannerLabel.Font = UnoTheme.HeadingFont;
-        _turnBannerLabel.ForeColor = UnoTheme.Ink;
-        _turnBannerLabel.TextAlign = ContentAlignment.MiddleLeft;
-
-        _statusLabel.Dock = DockStyle.Fill;
-        _statusLabel.Font = UnoTheme.BodyFont;
-        _statusLabel.ForeColor = UnoTheme.MutedInk;
-        _statusLabel.AutoEllipsis = true;
-        _statusLabel.TextAlign = ContentAlignment.MiddleLeft;
-
-        _seatPanel.Dock = DockStyle.Fill;
-        _seatPanel.ColumnCount = 2;
-        _seatPanel.RowCount = 2;
-        _seatPanel.BackColor = Color.Transparent;
-        _seatPanel.Padding = new Padding(0, 8, 0, 0);
-        _seatPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        _seatPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        _seatPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-        _seatPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-
-        layout.Controls.Add(_turnBannerLabel, 0, 0);
-        layout.Controls.Add(_statusLabel, 0, 1);
-        layout.Controls.Add(_seatPanel, 0, 2);
-        host.Controls.Add(layout);
-        return host;
-    }
-
-    private Control BuildBoardPanel()
-    {
-        var board = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = UnoTheme.TableOuter,
-            Padding = new Padding(18)
-        };
-
-        var layout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 3,
-            BackColor = Color.Transparent
-        };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
-
-        layout.Controls.Add(BuildInfoColumn(), 0, 0);
-        layout.Controls.Add(BuildCenterBoard(), 1, 0);
-        layout.Controls.Add(BuildActionsColumn(), 2, 0);
-        board.Controls.Add(layout);
-        return board;
-    }
-
-    private Control BuildInfoColumn()
-    {
-        var panel = CreateSurfacePanel();
-        panel.Padding = new Padding(14);
-
-        var title = new Label
-        {
-            Text = "Round Pulse",
-            Dock = DockStyle.Top,
-            Height = 32,
-            Font = UnoTheme.HeadingFont,
-            ForeColor = UnoTheme.Ink
-        };
-
-        _currentColorLabel.Dock = DockStyle.Top;
-        _currentColorLabel.Height = 44;
-        _currentColorLabel.Font = UnoTheme.HeadingFont;
-        _currentColorLabel.TextAlign = ContentAlignment.MiddleCenter;
-
-        var help = new Label
-        {
-            Text = "Play a glowing card. If none glow, use Draw and Pass.",
-            Dock = DockStyle.Top,
-            Height = 58,
-            Font = UnoTheme.BodyFont,
-            ForeColor = UnoTheme.MutedInk,
-            Padding = new Padding(0, 12, 0, 0)
-        };
-
-        panel.Controls.Add(help);
-        panel.Controls.Add(_currentColorLabel);
-        panel.Controls.Add(title);
-        return panel;
-    }
-
-    private Control BuildCenterBoard()
-    {
-        var layout = new TableLayoutPanel
+        var root = new DoubleBufferedTableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
+            RowCount = 1,
             BackColor = Color.Transparent,
-            Padding = new Padding(16, 10, 16, 10)
+            Padding = new Padding(24)
         };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 23));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 77));
 
-        _drawPileCard.IsFaceDown = true;
-        _drawPileCard.IsPileCard = true;
-        _drawPileCard.Size = new Size(120, 174);
-        _drawPileCard.Anchor = AnchorStyles.None;
+        root.Controls.Add(BuildSidebar(), 0, 0);
+        root.Controls.Add(BuildMainPanel(), 1, 0);
 
-        _discardCard.IsPileCard = true;
-        _discardCard.Size = new Size(120, 174);
-        _discardCard.Anchor = AnchorStyles.None;
-
-        layout.Controls.Add(CreatePileHost("Draw Pile", _drawPileCard, _drawCountLabel), 0, 0);
-        layout.Controls.Add(CreateTopCardHost(), 1, 0);
-        return layout;
+        var bg = new PastelBackgroundPanel { Dock = DockStyle.Fill };
+        bg.Controls.Add(root);
+        Controls.Add(bg);
     }
 
-    private Control CreatePileHost(string titleText, Control cardControl, Label footerLabel)
+    private Control BuildSidebar()
     {
-        var host = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            RowCount = 3,
-            BackColor = Color.Transparent
-        };
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
-        host.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
-
-        var title = new Label
-        {
-            Text = titleText,
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = UnoTheme.BodyFont,
-            ForeColor = Color.White
-        };
-
-        var cardHolder = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
-        cardHolder.Controls.Add(cardControl);
-        cardControl.Location = new Point((Math.Max(0, cardHolder.Width - cardControl.Width)) / 2, 0);
-        cardHolder.Resize += (_, _) =>
-        {
-            cardControl.Location = new Point((Math.Max(0, cardHolder.Width - cardControl.Width)) / 2, Math.Max(0, (cardHolder.Height - cardControl.Height) / 2));
-        };
-
-        footerLabel.Dock = DockStyle.Fill;
-        footerLabel.TextAlign = ContentAlignment.MiddleCenter;
-        footerLabel.Font = UnoTheme.SmallFont;
-        footerLabel.ForeColor = Color.White;
-
-        host.Controls.Add(title, 0, 0);
-        host.Controls.Add(cardHolder, 0, 1);
-        host.Controls.Add(footerLabel, 0, 2);
-        return host;
-    }
-
-    private Control CreateTopCardHost()
-    {
-        var host = CreatePileHost("Top Card", _discardCard, new Label());
-        return host;
-    }
-
-    private Control BuildActionsColumn()
-    {
-        var panel = CreateSurfacePanel();
-        panel.Padding = new Padding(14);
-
-        var layout = new TableLayoutPanel
+        var sidebar = new DoubleBufferedTableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
-            BackColor = Color.Transparent
+            RowCount = 7,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0, 0, 24, 0)
         };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        
+        sidebar.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Art
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 200)); // Draw
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 200)); // Discard
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Spacer
+        sidebar.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // End Game
+        sidebar.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // New Game
+        sidebar.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Footer
 
-        var title = new Label
+        // 1. Art - Natively on background
+        var art = new DecorativeUnoPanel { Dock = DockStyle.Top, Height = 280, Margin = new Padding(0, 0, 0, 24) };
+        sidebar.Controls.Add(art, 0, 0);
+
+        // 2. Draw Pile
+        _drawPileCard.IsFaceDown = true;
+        _drawPileCard.IsPileCard = true;
+        _drawPileCard.Size = new Size(114, 160);
+        _drawCountLabel.Font = new Font(UnoTheme.MainFontFamily, 44, FontStyle.Bold);
+        _drawCountLabel.ForeColor = UnoTheme.Ink;
+        _drawCountLabel.TextAlign = ContentAlignment.BottomRight;
+        _drawCountLabel.Dock = DockStyle.Fill;
+        sidebar.Controls.Add(CreatePileCard("DRAW PILE", _drawPileCard, _drawCountLabel), 0, 1);
+
+        // 3. Discard Pile
+        _discardCard.IsPileCard = true;
+        _discardCard.Size = new Size(114, 160);
+        _discardCountLabel.Font = new Font(UnoTheme.MainFontFamily, 44, FontStyle.Bold);
+        _discardCountLabel.ForeColor = UnoTheme.Ink;
+        _discardCountLabel.TextAlign = ContentAlignment.BottomRight;
+        _discardCountLabel.Dock = DockStyle.Fill;
+        sidebar.Controls.Add(CreatePileCard("DISCARD PILE", _discardCard, _discardCountLabel), 0, 2);
+
+        // 4. Spacer (empty)
+        sidebar.Controls.Add(new Panel { Dock = DockStyle.Fill }, 0, 3);
+
+        // 5. End Game
+        var endBtn = new ModernButton { Text = "⏻   End Game", Dock = DockStyle.Top, Height = 56, Margin = new Padding(0, 0, 0, 16), IsGradient = true };
+        endBtn.Click += (_, _) => (NavigateBack ?? Close)();
+        sidebar.Controls.Add(endBtn, 0, 4);
+
+        // 6. New Game
+        var newBtn = new ModernButton { Text = "+   New Game", Dock = DockStyle.Top, Height = 56, Margin = new Padding(0, 0, 0, 24), AccentColor = UnoTheme.PrimaryPurple, BackColor = Color.White, ForeColor = UnoTheme.PrimaryPurple };
+        newBtn.Click += (_, _) => (NavigateBack ?? Close)();
+        sidebar.Controls.Add(newBtn, 0, 5);
+        
+        // 7. Footer
+        var footer = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Top, Height = 50, ColumnCount = 2, RowCount = 1, BackColor = Color.Transparent, Margin = new Padding(0) };
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        var helpBtn = new ModernButton
         {
-            Text = "Actions",
+            Text = "❔ Help",
             Dock = DockStyle.Fill,
-            Font = UnoTheme.HeadingFont,
-            ForeColor = UnoTheme.Ink
+            Margin = new Padding(0, 0, 8, 0),
+            BackColor = Color.White,
+            ForeColor = UnoTheme.Ink,
+            AccentColor = UnoTheme.Border,
+            Font = new Font(UnoTheme.TextFontFamily, 11f, FontStyle.Regular),
+            CornerRadius = 16
         };
-
-        var help = new Label
+        var aboutBtn = new ModernButton
         {
-            Text = "Use Draw and Pass only when you cannot play a highlighted card.",
+            Text = "ⓘ About",
             Dock = DockStyle.Fill,
-            Font = UnoTheme.BodyFont,
-            ForeColor = UnoTheme.MutedInk
+            Margin = new Padding(8, 0, 0, 0),
+            BackColor = Color.White,
+            ForeColor = UnoTheme.Ink,
+            AccentColor = UnoTheme.Border,
+            Font = new Font(UnoTheme.TextFontFamily, 11f, FontStyle.Regular),
+            CornerRadius = 16
         };
+        footer.Controls.Add(helpBtn, 0, 0);
+        footer.Controls.Add(aboutBtn, 1, 0);
+        sidebar.Controls.Add(footer, 0, 6);
 
-        _drawButton.Text = "Draw and Pass";
-        _drawButton.Dock = DockStyle.Fill;
-        UnoTheme.ApplyPrimaryButton(_drawButton);
-        _drawButton.Click += (_, _) => DrawCardForHuman();
-
-        _closeButton.Text = "Close Match";
-        _closeButton.Dock = DockStyle.Fill;
-        UnoTheme.ApplySecondaryButton(_closeButton);
-        _closeButton.Click += (_, _) => Close();
-
-        layout.Controls.Add(title, 0, 0);
-        layout.Controls.Add(help, 0, 1);
-        layout.Controls.Add(_drawButton, 0, 2);
-        layout.Controls.Add(_closeButton, 0, 3);
-        panel.Controls.Add(layout);
-        return panel;
+        return sidebar;
     }
 
-    private Control BuildHandPanel()
+    private Control CreatePileCard(string titleText, Control cardControl, Label countLabel)
     {
-        var host = CreateSurfacePanel();
-        host.Padding = new Padding(16, 12, 16, 12);
+        var card = new RoundedPanel { Dock = DockStyle.Fill, FillColor = Color.White, CornerRadius = 20, Margin = new Padding(0, 0, 0, 24) };
+        var layout = new DoubleBufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, BackColor = Color.Transparent, Padding = new Padding(20) };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        var title = new Label
+        var title = new Label { Text = titleText, Font = UnoTheme.ButtonFont, ForeColor = UnoTheme.MutedInk, Dock = DockStyle.Fill, TextAlign = ContentAlignment.TopRight };
+        
+        var cardHolder = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+        cardHolder.Controls.Add(cardControl);
+        layout.SetRowSpan(cardHolder, 2);
+        
+        cardControl.Location = new Point(0, 0); // Put it directly top-left in the available space
+
+        layout.Controls.Add(cardHolder, 0, 0);
+        layout.Controls.Add(title, 1, 0);
+        layout.Controls.Add(countLabel, 1, 1);
+        
+        card.Controls.Add(layout);
+        return card;
+    }
+
+    private Control BuildMainPanel()
+    {
+        _mainPanel.Dock = DockStyle.Fill;
+        _mainPanel.FlowDirection = FlowDirection.TopDown;
+        _mainPanel.WrapContents = false;
+        _mainPanel.AutoScroll = true;
+        _mainPanel.BackColor = Color.Transparent;
+
+        for (int i = 0; i < 4; i++)
         {
-            Text = "Current Hand",
-            Dock = DockStyle.Top,
-            Height = 30,
-            Font = UnoTheme.HeadingFont,
-            ForeColor = UnoTheme.Ink
-        };
+            var pCard = new GamePlayerCardControl();
+            pCard.CardClicked += (s, card) => HandleHumanCardClick(card);
+            _playerCards.Add(pCard);
+            _mainPanel.Controls.Add(pCard);
+        }
 
-        _handPanel.Dock = DockStyle.Fill;
-        _handPanel.FlowDirection = FlowDirection.LeftToRight;
-        _handPanel.WrapContents = false;
-        _handPanel.AutoScroll = true;
-        _handPanel.Padding = new Padding(6, 10, 6, 10);
-        _handPanel.BackColor = Color.Transparent;
-
-        host.Controls.Add(_handPanel);
-        host.Controls.Add(title);
-        return host;
-    }
-
-    private Panel CreateSurfacePanel()
-    {
-        return new Panel
+        _mainPanel.Resize += (_, _) =>
         {
-            Dock = DockStyle.Fill,
-            BackColor = UnoTheme.Surface,
-            Padding = new Padding(12)
-        };
-    }
-
-    private void RefreshBoard()
-    {
-        _turnBannerLabel.Text = $"{_session.CurrentPlayer.Definition.Name}'s turn - {_session.CurrentPlayer.Definition.Type}";
-        _statusLabel.Text = _session.CurrentPlayer.Definition.Type == PlayerType.Human
-            ? $"{_session.LastAction} Click a glowing card to play, or draw if needed."
-            : _session.LastAction;
-
-        _currentColorLabel.Text = $"Color: {_session.CurrentColor}";
-        _currentColorLabel.BackColor = UnoTheme.GetCardColor(_session.CurrentColor);
-        _currentColorLabel.ForeColor = UnoTheme.GetCardInk(_session.CurrentColor);
-        _drawCountLabel.Text = $"{_session.DrawPile.Count} cards left";
-
-        _discardCard.Card = _session.CurrentCard;
-        _discardCard.IsFaceDown = false;
-        _discardCard.Invalidate();
-
-        RenderSeatSummary();
-        RenderHand();
-    }
-
-    private void RenderSeatSummary()
-    {
-        _seatPanel.SuspendLayout();
-        _seatPanel.Controls.Clear();
-
-        for (var index = 0; index < 4; index++)
-        {
-            var cell = new Panel
+            foreach (Control c in _mainPanel.Controls)
             {
-                Dock = DockStyle.Fill,
-                Margin = new Padding(0, 0, 8, 8),
-                BackColor = index < _session.Players.Count && ReferenceEquals(_session.Players[index], _session.CurrentPlayer)
-                    ? Color.FromArgb(255, 247, 222)
-                    : Color.White,
-                BorderStyle = BorderStyle.FixedSingle,
-                Padding = new Padding(10, 8, 10, 8)
-            };
-
-            if (index < _session.Players.Count)
-            {
-                var player = _session.Players[index];
-                var name = new Label
-                {
-                    Text = player.Definition.Name,
-                    Dock = DockStyle.Top,
-                    Height = 20,
-                    Font = UnoTheme.BodyFont,
-                    ForeColor = UnoTheme.Ink
-                };
-                var details = new Label
-                {
-                    Text = $"{player.Definition.Type}  |  Cards: {player.Hand.Count}",
-                    Dock = DockStyle.Top,
-                    Height = 18,
-                    Font = UnoTheme.SmallFont,
-                    ForeColor = UnoTheme.MutedInk
-                };
-                var state = new Label
-                {
-                    Text = player.FinishRank.HasValue ? $"Rank {player.FinishRank.Value}" : ReferenceEquals(player, _session.CurrentPlayer) ? "Turn" : "Waiting",
-                    Dock = DockStyle.Bottom,
-                    Height = 18,
-                    Font = UnoTheme.BadgeFont,
-                    ForeColor = ReferenceEquals(player, _session.CurrentPlayer) ? UnoTheme.Accent : UnoTheme.MutedInk,
-                    TextAlign = ContentAlignment.MiddleRight
-                };
-
-                cell.Controls.Add(state);
-                cell.Controls.Add(details);
-                cell.Controls.Add(name);
+                c.Width = _mainPanel.ClientSize.Width - 16;
             }
+        };
 
-            _seatPanel.Controls.Add(cell, index % 2, index / 2);
-        }
-
-        _seatPanel.ResumeLayout();
+        return _mainPanel;
     }
 
-    private void RenderHand()
+    private async void HandleHumanCardClick(Card card)
     {
-        _handPanel.SuspendLayout();
-        _handPanel.Controls.Clear();
-
-        var currentPlayer = _session.CurrentPlayer;
-        var playableCards = _ruleEngine.GetPlayableCards(_session, currentPlayer).Select(card => card.InstanceId).ToHashSet();
-        var isHumanTurn = currentPlayer.Definition.Type == PlayerType.Human && !_session.IsCompleted;
-
-        foreach (var card in currentPlayer.Hand)
-        {
-            var canPlay = playableCards.Contains(card.InstanceId);
-            var cardControl = new UnoCardControl
-            {
-                Card = card,
-                IsPlayable = isHumanTurn && canPlay,
-                Enabled = isHumanTurn && (!_session.Options.HighlightPlayableCards || canPlay),
-                Margin = new Padding(0, 0, 8, 0),
-                Size = new Size(108, 156)
-            };
-
-            cardControl.Click += CardButtonOnClick;
-            _handPanel.Controls.Add(cardControl);
-        }
-
-        _drawButton.Enabled = isHumanTurn;
-        if (isHumanTurn && playableCards.Count == 0)
-        {
-            _statusLabel.Text = "No playable card right now. Use Draw and Pass.";
-        }
-
-        _handPanel.ResumeLayout();
-    }
-
-    private async void CardButtonOnClick(object? sender, EventArgs e)
-    {
-        if (sender is not UnoCardControl { Card: not null } cardControl)
-        {
-            return;
-        }
-
-        var card = cardControl.Card;
         CardColor? chosenColor = null;
         if (card.IsWild)
         {
             using var dialog = new WildColorDialog();
-            if (dialog.ShowDialog(this) != DialogResult.OK)
-            {
-                return;
-            }
-
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
             chosenColor = dialog.SelectedColor;
         }
 
@@ -473,17 +247,56 @@ public sealed class GameForm : Form
         await HandleMoveResultAsync(result);
     }
 
-    private async void DrawCardForHuman()
+    private void RefreshBoard()
     {
-        var result = _ruleEngine.DrawCardAndPass(_session);
-        await HandleMoveResultAsync(result);
+        _drawCountLabel.Text = _session.DrawPile.Count.ToString();
+        _discardCountLabel.Text = _session.DiscardPile.Count.ToString();
+
+        _discardCard.Card = _session.CurrentCard;
+        _discardCard.IsFaceDown = false;
+        _discardCard.Invalidate();
+
+        var isHumanTurn = _session.CurrentPlayer.Definition.Type == PlayerType.Human && !_session.IsCompleted;
+        var playableCards = _ruleEngine.GetPlayableCards(_session, _session.CurrentPlayer).Select(c => c.InstanceId).ToHashSet();
+
+        for (int i = 0; i < 4; i++)
+        {
+            if (i < _session.Players.Count)
+            {
+                var player = _session.Players[i];
+                bool isCurrent = ReferenceEquals(player, _session.CurrentPlayer);
+                _playerCards[i].Bind(player, isCurrent, isHumanTurn, playableCards);
+            }
+            else
+            {
+                _playerCards[i].SetEmpty();
+            }
+        }
+        
+        // Auto-draw if human has no playable cards
+        if (isHumanTurn && playableCards.Count == 0)
+        {
+            // Give them a moment to see they have no moves before drawing
+            System.Windows.Forms.Timer t = new();
+            t.Interval = 1000;
+            t.Tick += async (_, _) => 
+            {
+                t.Stop();
+                t.Dispose();
+                if (!_session.IsCompleted && _session.CurrentPlayer.Definition.Type == PlayerType.Human)
+                {
+                    var result = _ruleEngine.DrawCardAndPass(_session);
+                    await HandleMoveResultAsync(result);
+                }
+            };
+            t.Start();
+        }
     }
 
     private async Task HandleMoveResultAsync(MoveResult result)
     {
         if (result.Status != MoveStatus.Success)
         {
-            MessageBox.Show(this, result.Message, "Move Not Allowed", MessageBoxButtons.OK, MessageBoxIcon.Information);
             RefreshBoard();
             return;
         }
@@ -501,12 +314,7 @@ public sealed class GameForm : Form
 
     private void TriggerComputerTurnIfNeeded()
     {
-        if (_session.IsCompleted || _session.CurrentPlayer.Definition.Type == PlayerType.Human)
-        {
-            return;
-        }
-
-        _statusLabel.Text = $"{_session.CurrentPlayer.Definition.Name} is thinking...";
+        if (_session.IsCompleted || _session.CurrentPlayer.Definition.Type == PlayerType.Human) return;
         _computerTimer.Interval = Math.Max(150, _session.Options.ComputerPlayerDelayMs);
         _computerTimer.Start();
     }
@@ -515,10 +323,7 @@ public sealed class GameForm : Form
     {
         _computerTimer.Stop();
 
-        if (_session.IsCompleted || _session.CurrentPlayer.Definition.Type == PlayerType.Human)
-        {
-            return;
-        }
+        if (_session.IsCompleted || _session.CurrentPlayer.Definition.Type == PlayerType.Human) return;
 
         var (card, chosenColor) = _computerPlayerService.ChooseMove(_session, _ruleEngine);
         var result = card is null
@@ -530,27 +335,18 @@ public sealed class GameForm : Form
 
     private async Task ShowResultsAsync()
     {
-        if (_resultShown)
-        {
-            return;
-        }
-
+        if (_resultShown) return;
         _resultShown = true;
-        try
-        {
-            await _persistenceService.SaveCompletedMatchAsync(_session);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, $"The match finished, but saving failed: {ex.Message}", "Save Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
+
+        try { await _persistenceService.SaveCompletedMatchAsync(_session); }
+        catch { }
 
         var persistenceMessage = _persistenceService.DatabaseAvailable
             ? "Match results were saved to SQL Server."
             : _persistenceService.StatusMessage;
 
         using var resultsForm = new ResultsForm(_session, persistenceMessage);
-        resultsForm.ShowDialog(this);
-        Close();
+        resultsForm.ShowDialog(this.TopLevelControl as Form ?? this);
+        (NavigateBack ?? Close)();
     }
 }
