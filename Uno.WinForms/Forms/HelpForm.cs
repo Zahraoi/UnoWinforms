@@ -43,10 +43,17 @@ public sealed partial class HelpForm : Form
             - Computer players move automatically after a short delay.
             - The draw pile is on the left side of the game screen.
             - The top card in the discard pile determines what can be played next.
+            - This version uses a custom 50-card deck for shorter matches.
 
             If you cannot play:
             - use Draw and Pass, or
             - in some situations the game may automatically draw when no playable move exists.
+
+            Deck exhaustion rule:
+            - when the draw pile reaches 0, the discard pile is not recycled.
+            - the game stops immediately.
+            - the player with the fewest remaining cards wins.
+            - if tied, lower hand score is used as the tie-breaker.
 
             Extra controls:
             - End Game: leave the current game and return.
@@ -58,11 +65,12 @@ public sealed partial class HelpForm : Form
             """);
 
         SetTabContent(rulesRichTextBox, """
-            This app uses the implemented UNO-style rules for this project.
+            This app uses a custom UNO-style ruleset for this project.
 
             Basic play:
             - Match by color, number, or action.
             - Wild cards can be played when needed and let you choose the next color.
+            - The deck contains 50 cards instead of the standard full UNO deck.
 
             Action cards:
             - Skip: next player loses their turn.
@@ -73,7 +81,9 @@ public sealed partial class HelpForm : Form
 
             Winning:
             - A player finishes when they play their last card.
-            - Depending on selected options, the game may stop after the first winner or continue ranking players.
+            - If the draw pile becomes empty, the game ends without recycling discard cards.
+            - In that case, the player with the fewest cards remaining is declared the winner.
+            - If players tie on card count, the lower hand score wins.
 
             Note:
             This build follows the current implemented ruleset in your project and may not include every official challenge variation from physical UNO editions.

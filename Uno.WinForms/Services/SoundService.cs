@@ -6,21 +6,32 @@ public static class SoundService
 {
     private static readonly object SyncLock = new();
     private static readonly string SoundRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "Sounds");
+    private static readonly float BackgroundBaseVolume = 0.58f;
+    private static readonly float BackgroundDuckVolume = 0.18f;
     private static WaveOutEvent? _backgroundOutput;
     private static AudioFileReader? _backgroundReader;
     private static LoopStream? _backgroundLoop;
+    private static int _duckToken;
 
-    public static void PlayButtonClick() => PlayOneShot("button_click.wav");
+    public static void PlayButtonClick() => PlayOneShot("button_click.wav", 0.75f);
 
-    public static void PlayCardPlay() => PlayOneShot("soundc.wav");
+    public static void PlayCardPlay() => PlayOneShot("soundc.wav", 0.95f);
 
-    public static void PlayCardDraw() => PlayOneShot("card_draw.wav");
+    public static void PlayCardDraw() => PlayOneShot("card_draw.wav", 0.88f);
 
-    public static void PlayError() => PlayOneShot("error.wav");
+    public static void PlayError() => PlayOneShot("error.wav", 0.90f);
 
-    public static void PlayWin() => PlayOneShot("win.wav");
+    public static void PlayWin()
+    {
+        DuckBackgroundTemporarily(900);
+        PlayOneShot("win.wav", 1.00f);
+    }
 
-    public static void PlayLose() => PlayOneShot("lose.wav");
+    public static void PlayLose()
+    {
+        DuckBackgroundTemporarily(900);
+        PlayOneShot("lose.wav", 0.98f);
+    }
 
     public static void StartBackgroundLoop()
     {
@@ -44,7 +55,7 @@ public static class SoundService
 
             try
             {
-                _backgroundReader = new AudioFileReader(path) { Volume = 0.18f };
+                _backgroundReader = new AudioFileReader(path) { Volume = BackgroundBaseVolume };
                 _backgroundLoop = new LoopStream(_backgroundReader);
                 _backgroundOutput = new WaveOutEvent();
                 _backgroundOutput.Init(_backgroundLoop);
@@ -65,7 +76,7 @@ public static class SoundService
         }
     }
 
-    private static void PlayOneShot(string fileName)
+    private static void PlayOneShot(string fileName, float volume)
     {
         var path = GetPath(fileName);
         if (path is null)
@@ -77,7 +88,7 @@ public static class SoundService
         {
             try
             {
-                var reader = new AudioFileReader(path);
+                var reader = new AudioFileReader(path) { Volume = volume };
                 var output = new WaveOutEvent();
                 output.Init(reader);
                 output.PlaybackStopped += (_, _) =>
@@ -97,6 +108,43 @@ public static class SoundService
     {
         var path = Path.Combine(SoundRoot, fileName);
         return File.Exists(path) ? path : null;
+    }
+
+    private static void DuckBackgroundTemporarily(int milliseconds)
+    {
+        AudioFileReader? reader;
+        int token;
+
+        lock (SyncLock)
+        {
+            if (_backgroundReader is null)
+            {
+                return;
+            }
+
+            _duckToken++;
+            token = _duckToken;
+            _backgroundReader.Volume = BackgroundDuckVolume;
+            reader = _backgroundReader;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(milliseconds);
+                lock (SyncLock)
+                {
+                    if (_backgroundReader is not null && ReferenceEquals(_backgroundReader, reader) && token == _duckToken)
+                    {
+                        _backgroundReader.Volume = BackgroundBaseVolume;
+                    }
+                }
+            }
+            catch
+            {
+            }
+        });
     }
 
     private static void DisposeBackground()

@@ -6,21 +6,21 @@ public static class DeckService
 {
     public static List<Card> CreateStandardDeck()
     {
-        var deck = new List<Card>(108);
+        var deck = new List<Card>(50);
 
         foreach (var color in new[] { CardColor.Red, CardColor.Yellow, CardColor.Green, CardColor.Blue })
         {
-            deck.Add(new Card(color, CardFace.Zero));
-
-            for (var value = CardFace.One; value <= CardFace.DrawTwo; value++)
+            for (var value = CardFace.Zero; value <= CardFace.Nine; value++)
             {
-                deck.Add(new Card(color, value));
                 deck.Add(new Card(color, value));
             }
         }
 
-        for (var index = 0; index < 4; index++)
+        for (var index = 0; index < 2; index++)
         {
+            deck.Add(new Card(CardColor.Red, CardFace.Skip));
+            deck.Add(new Card(CardColor.Yellow, CardFace.Reverse));
+            deck.Add(new Card(CardColor.Green, CardFace.DrawTwo));
             deck.Add(new Card(CardColor.Wild, CardFace.Wild));
             deck.Add(new Card(CardColor.Wild, CardFace.WildDrawFour));
         }

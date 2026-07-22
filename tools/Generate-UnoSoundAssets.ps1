@@ -200,8 +200,103 @@ function New-SoftLoopWav {
     $fileStream.Dispose()
 }
 
+function New-WinJingleWav {
+    param(
+        [string]$Path
+    )
+
+    $sampleRate = 22050
+    $channels = 1
+    $bitsPerSample = 16
+    $notes = @(
+        @{ Freq = 523.25; Ms = 90 },
+        @{ Freq = 659.25; Ms = 90 },
+        @{ Freq = 783.99; Ms = 120 },
+        @{ Freq = 1046.50; Ms = 180 }
+    )
+    $totalMs = 0
+    foreach ($note in $notes) {
+        $totalMs += $note.Ms
+    }
+    $samples = [int]($sampleRate * $totalMs / 1000)
+    $dataSize = $samples * $channels * ($bitsPerSample / 8)
+
+    $fileStream = [System.IO.File]::Create($Path)
+    $writer = [System.IO.BinaryWriter]::new($fileStream)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('RIFF'))
+    $writer.Write([int](36 + $dataSize))
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('WAVE'))
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('fmt '))
+    $writer.Write([int]16)
+    $writer.Write([Int16]1)
+    $writer.Write([Int16]$channels)
+    $writer.Write([int]$sampleRate)
+    $writer.Write([int]($sampleRate * $channels * ($bitsPerSample / 8)))
+    $writer.Write([Int16]($channels * ($bitsPerSample / 8)))
+    $writer.Write([Int16]$bitsPerSample)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('data'))
+    $writer.Write([int]$dataSize)
+
+    foreach ($note in $notes) {
+        $noteSamples = [int]($sampleRate * $note.Ms / 1000)
+        for ($i = 0; $i -lt $noteSamples; $i++) {
+            $time = $i / $sampleRate
+            $progress = $i / [double]$noteSamples
+            $env = [Math]::Exp(-3.2 * $progress)
+            $sample = (([Math]::Sin(2 * [Math]::PI * $note.Freq * $time)) + (0.35 * [Math]::Sin(2 * [Math]::PI * ($note.Freq * 2) * $time))) * 0.34 * $env
+            $sample = [Math]::Max(-0.85, [Math]::Min(0.85, $sample))
+            $writer.Write([Int16]($sample * 32767))
+        }
+    }
+
+    $writer.Dispose()
+    $fileStream.Dispose()
+}
+
+function New-LoseToneWav {
+    param(
+        [string]$Path
+    )
+
+    $sampleRate = 22050
+    $channels = 1
+    $bitsPerSample = 16
+    $durationMs = 260
+    $samples = [int]($sampleRate * $durationMs / 1000)
+    $dataSize = $samples * $channels * ($bitsPerSample / 8)
+
+    $fileStream = [System.IO.File]::Create($Path)
+    $writer = [System.IO.BinaryWriter]::new($fileStream)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('RIFF'))
+    $writer.Write([int](36 + $dataSize))
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('WAVE'))
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('fmt '))
+    $writer.Write([int]16)
+    $writer.Write([Int16]1)
+    $writer.Write([Int16]$channels)
+    $writer.Write([int]$sampleRate)
+    $writer.Write([int]($sampleRate * $channels * ($bitsPerSample / 8)))
+    $writer.Write([Int16]($channels * ($bitsPerSample / 8)))
+    $writer.Write([Int16]$bitsPerSample)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('data'))
+    $writer.Write([int]$dataSize)
+
+    for ($i = 0; $i -lt $samples; $i++) {
+        $time = $i / $sampleRate
+        $progress = $i / [double]$samples
+        $freq = 220 - (70 * $progress)
+        $env = [Math]::Exp(-2.8 * $progress)
+        $sample = (([Math]::Sin(2 * [Math]::PI * $freq * $time)) + (0.18 * [Math]::Sin(2 * [Math]::PI * ($freq * 0.5) * $time))) * 0.36 * $env
+        $sample = [Math]::Max(-0.85, [Math]::Min(0.85, $sample))
+        $writer.Write([Int16]($sample * 32767))
+    }
+
+    $writer.Dispose()
+    $fileStream.Dispose()
+}
+
 New-Wav -Path (Join-Path $soundDir 'button_click.wav') -Frequency 880 -DurationMs 70
 New-CardStyleWav -Path (Join-Path $soundDir 'card_draw.wav') -DurationMs 108 -Impact 0.20 -Rustle 0.18 -BodyFrequency 145 -BodyAmount 0.06
 New-Wav -Path (Join-Path $soundDir 'error.wav') -Frequency 240 -DurationMs 150
-New-Wav -Path (Join-Path $soundDir 'win.wav') -Frequency 1040 -DurationMs 180
-New-Wav -Path (Join-Path $soundDir 'lose.wav') -Frequency 180 -DurationMs 220
+New-WinJingleWav -Path (Join-Path $soundDir 'win.wav')
+New-LoseToneWav -Path (Join-Path $soundDir 'lose.wav')

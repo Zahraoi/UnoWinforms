@@ -18,6 +18,12 @@ public sealed class RuleEngine
             throw new ArgumentOutOfRangeException(nameof(options), "Cards per player must be between 1 and 15.");
         }
 
+        var availableDeckCards = DeckService.CreateStandardDeck().Count;
+        if ((players.Count * options.CardsPerPlayer) > availableDeckCards - 2)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options), $"Cards per player is too high for the custom {availableDeckCards}-card deck and current player count.");
+        }
+
         var gamePlayers = players.Select((player, index) => new GamePlayer(index, player)).ToList();
         var session = new GameSession(gamePlayers, options, randomSeed);
         var random = randomSeed.HasValue ? new Random(randomSeed.Value) : Random.Shared;
@@ -173,6 +179,18 @@ public sealed class RuleEngine
 
         if (!TryDrawCards(session, session.CurrentPlayer, 1, out var drawnCards))
         {
+            if (session.IsCompleted)
+            {
+                return new MoveResult
+                {
+                    Status = MoveStatus.Success,
+                    Message = session.LastAction,
+                    DrawnCards = drawnCards,
+                    TurnAdvanced = false,
+                    GameCompleted = true
+                };
+            }
+
             return Failure(MoveStatus.CannotDraw, "No cards are available to draw.");
         }
 
@@ -234,7 +252,11 @@ public sealed class RuleEngine
                 break;
 
             case CardFace.DrawTwo:
-                ApplyForcedDraw(session, 2);
+                if (ApplyForcedDraw(session, 2))
+                {
+                    return;
+                }
+
                 stepCount++;
                 session.LastAction = $"{session.CurrentPlayer.Definition.Name} forced the next player to draw 2.";
                 break;
@@ -244,7 +266,11 @@ public sealed class RuleEngine
                 break;
 
             case CardFace.WildDrawFour:
-                ApplyForcedDraw(session, 4);
+                if (ApplyForcedDraw(session, 4))
+                {
+                    return;
+                }
+
                 stepCount++;
                 session.LastAction = $"{session.CurrentPlayer.Definition.Name} changed the color to {session.CurrentColor} and forced a draw 4.";
                 break;
@@ -254,11 +280,12 @@ public sealed class RuleEngine
         session.CurrentPlayer.TurnCount++;
     }
 
-    private void ApplyForcedDraw(GameSession session, int count)
+    private bool ApplyForcedDraw(GameSession session, int count)
     {
         var targetIndex = FindNextActiveIndex(session, session.CurrentPlayerIndex, 1);
         var targetPlayer = session.Players[targetIndex];
-        TryDrawCards(session, targetPlayer, count, out _);
+        var drawn = TryDrawCards(session, targetPlayer, count, out _);
+        return !drawn && session.IsCompleted;
     }
 
     private bool TryDrawCards(GameSession session, GamePlayer player, int count, out IReadOnlyList<Card> drawnCards)
@@ -269,6 +296,7 @@ public sealed class RuleEngine
         {
             if (!EnsureDrawPileAvailable(session))
             {
+                FinalizeGameDueToEmptyDrawPile(session);
                 drawnCards = results;
                 return false;
             }
@@ -287,21 +315,6 @@ public sealed class RuleEngine
 
     private static bool EnsureDrawPileAvailable(GameSession session)
     {
-        if (session.DrawPile.Count > 0)
-        {
-            return true;
-        }
-
-        if (session.DiscardPile.Count <= 1)
-        {
-            return false;
-        }
-
-        var cardsToRecycle = session.DiscardPile.Take(session.DiscardPile.Count - 1).ToList();
-        session.DiscardPile.RemoveRange(0, session.DiscardPile.Count - 1);
-        DeckService.Shuffle(cardsToRecycle, Random.Shared);
-        session.DrawPile.AddRange(cardsToRecycle);
-
         return session.DrawPile.Count > 0;
     }
 
@@ -376,5 +389,32 @@ public sealed class RuleEngine
 
         session.IsCompleted = true;
         session.CompletedAtUtc = DateTimeOffset.UtcNow;
+    }
+
+    private static void FinalizeGameDueToEmptyDrawPile(GameSession session)
+    {
+        if (session.IsCompleted)
+        {
+            return;
+        }
+
+        foreach (var player in session.Players)
+        {
+            player.FinishRank = null;
+        }
+
+        var nextRank = 1;
+        foreach (var player in session.Players
+                     .OrderBy(player => player.Hand.Count)
+                     .ThenBy(player => player.HandScore)
+                     .ThenBy(player => player.SeatNumber))
+        {
+            player.FinishRank = nextRank++;
+        }
+
+        session.IsCompleted = true;
+        session.CompletedAtUtc = DateTimeOffset.UtcNow;
+        var winner = session.GetOrderedResults().First();
+        session.LastAction = $"Draw pile is empty. {winner.Definition.Name} wins with the fewest cards remaining.";
     }
 }

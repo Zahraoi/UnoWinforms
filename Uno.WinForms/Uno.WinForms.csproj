@@ -14,10 +14,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="Assets\Cards\*.png">
+    <Content Include="Assets\Sounds\*.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Assets\Sounds\*.wav">
+    <Content Include="Assets\Cards\*.png" Condition="Exists('Assets\Cards')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Assets\Background\*.*" Condition="Exists('Assets\Background')">

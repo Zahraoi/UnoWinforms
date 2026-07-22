@@ -377,6 +377,8 @@ public sealed class GameForm : Form
             {
                 SoundService.PlayLose();
             }
+
+            await Task.Delay(650);
         }
 
         using var resultsForm = new ResultsForm(_session, persistenceMessage);

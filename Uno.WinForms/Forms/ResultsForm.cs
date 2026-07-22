@@ -18,7 +18,9 @@ public sealed partial class ResultsForm : Form
     {
         var winner = session.GetOrderedResults().First();
         winnerTitleLabel.Text = $"Winner: {winner.Definition.Name}";
-        winnerSubLabel.Text = $"{winner.Definition.Type} finished rank 1 with score {ScoringService.CalculateScore(winner, session)}.";
+        winnerSubLabel.Text = session.LastAction.Contains("Draw pile is empty", StringComparison.OrdinalIgnoreCase)
+            ? session.LastAction
+            : $"{winner.Definition.Type} finished rank 1 with score {ScoringService.CalculateScore(winner, session)}.";
         persistenceLabel.Text = persistenceMessage;
 
         rowsPanel.Controls.Clear();
